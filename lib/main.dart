@@ -4,6 +4,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:just_audio/just_audio.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -13,6 +15,7 @@ void main() {
 
 class Wordpuzzle extends StatefulWidget {
   const Wordpuzzle({Key? key}) : super(key: key);
+
   @override
   State<Wordpuzzle> createState() => _WordpuzzleState();
 }
@@ -20,10 +23,12 @@ class Wordpuzzle extends StatefulWidget {
 class _WordpuzzleState extends State<Wordpuzzle> {
   String imagename = "";
 
+  FlutterTts flutterTts = FlutterTts();
+
+  final player = AudioPlayer(); // Create a player
+
   Map map = {};
-
   bool vv = false;
-
   List<String> anslist = [];
   List<String> bottomlist = [];
   List<String> toplist = [];
@@ -39,6 +44,10 @@ class _WordpuzzleState extends State<Wordpuzzle> {
   List someImages = [];
 
   Future _initImages() async {
+    await player.setAsset("Musicdir/move.wav");
+    await player.load();
+    // await player.setLoopMode(LoopMode.one);
+
     // >> To get paths you need these 2 lines
     final manifestContent = await rootBundle.loadString('AssetManifest.json');
 
@@ -70,7 +79,7 @@ class _WordpuzzleState extends State<Wordpuzzle> {
       // String s2 = l2[0]; //dog
       // print("===${s2}");
       //
-      String s2 = imagename.split("/")[1].split("\.")[0];
+      s2 = imagename.split("/")[1].split("\.")[0];
       anslist = s2.split(""); // [d, o, g]
       toplist = List.filled(anslist.length, "");
       print("==$anslist");
@@ -85,6 +94,8 @@ class _WordpuzzleState extends State<Wordpuzzle> {
       print("$bottomlist");
     });
   }
+
+  String s2 = "";
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +116,10 @@ class _WordpuzzleState extends State<Wordpuzzle> {
                         crossAxisCount: 1),
                     itemBuilder: (context, index) {
                       return InkWell(
-                        onTap: () {
+                        onTap: () async {
+                          await player.load();
+                          await player.play();
+
                           setState(() {
                             if (toplist[index].isNotEmpty) {
                               bottomlist[map[index]] = toplist[index];
@@ -131,53 +145,83 @@ class _WordpuzzleState extends State<Wordpuzzle> {
                   height: 200,
                   child: GridView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: bottomlist.length,
+                    itemCount: 12,
                     shrinkWrap: true,
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2),
                     itemBuilder: (context, index) {
-                      return InkWell(
-                        onTap: () {
-                          setState(() {
-                            if (bottomlist[index].isNotEmpty) {
-                              for (int a = 0; a < anslist.length; a++) {
-                                if (toplist[a] == "") {
-                                  toplist[a] = bottomlist[index];
-                                  bottomlist[index] = "";
-                                  // from = where
-                                  map[a] = index;
-                                  print("==${map}");
-                                  // {0:2,1:9,2:5}
-                                  break;
+                      if (index == 10) {
+                        return Center(
+                          child: IconButton(
+                              onPressed: () async {
+                                // await flutterTts.setSpeechRate(0.1);
+                                await flutterTts.speak(s2);
+                              },
+                              icon: Icon(
+                                Icons.lightbulb,
+                                color: Colors.red,
+                              )),
+                        );
+                      } else if (index == 11) {
+                        return Center(
+                          child: IconButton(
+                              onPressed: () async {
+                                // await flutterTts.setSpeechRate(0.1);
+                                for (int i = 0; i < anslist.length; i++) {
+                                  await flutterTts.setSpeechRate(0.5);
+                                  await Future.delayed(Duration(seconds: 3));
+                                  await flutterTts.speak(anslist[i]);
+                                }
+                              },
+                              icon: Icon(
+                                Icons.lightbulb,
+                                color: Colors.blue,
+                              )),
+                        );
+                      } else {
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              if (bottomlist[index].isNotEmpty) {
+                                for (int a = 0; a < anslist.length; a++) {
+                                  if (toplist[a] == "") {
+                                    toplist[a] = bottomlist[index];
+                                    bottomlist[index] = "";
+                                    // from = where
+                                    map[a] = index;
+                                    print("==${map}");
+                                    // {0:2,1:9,2:5}
+                                    break;
+                                  }
+                                }
+
+                                if (listEquals(anslist, toplist)) {
+                                  setState(() {
+                                    cc = Colors.green;
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("YOU Are Won")));
+                                } else if (!toplist.contains("")) {
+                                  setState(() {
+                                    cc = Colors.red;
+                                  });
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text("Try More")));
                                 }
                               }
-
-                              if (listEquals(anslist, toplist)) {
-                                setState(() {
-                                  cc = Colors.green;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("YOU Are Won")));
-                              } else if (!toplist.contains("")) {
-                                setState(() {
-                                  cc = Colors.red;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text("Try More")));
-                              }
-                            }
-                          });
-                        },
-                        child: Container(
-                          margin: EdgeInsets.all(5),
-                          color: cc,
-                          alignment: Alignment.center,
-                          child: Text(
-                            "${bottomlist[index]}".toUpperCase(),
-                            style: TextStyle(fontSize: 30),
+                            });
+                          },
+                          child: Container(
+                            margin: EdgeInsets.all(5),
+                            color: cc,
+                            alignment: Alignment.center,
+                            child: Text(
+                              "${bottomlist[index]}".toUpperCase(),
+                              style: TextStyle(fontSize: 30),
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      }
                     },
                   ),
                 )
